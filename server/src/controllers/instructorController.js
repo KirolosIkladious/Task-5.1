@@ -89,24 +89,31 @@ export async function getDirectory(req, res, next) {
 }
 
 // GET /api/instructors/search
+
 export async function searchInstructors(req, res, next) {
   try {
-    // Step 1: Validate search parameters
+    // Validate query parameters
     const { error, value } = searchSchema.validate(
       req.query,
       { convert: false }
     );
 
+    // Reject invalid searches safely without executing
+    // any MongoDB query
     if (error) {
-      return res.status(400).json({
-        message: 'Search requires a valid name string'
+      return res.status(200).json({
+        count: 0,
+        instructors: []
       });
     }
 
-    // Step 2: Safely search by instructor name
+    // Escape regex characters supplied by the user
+    const safeName = escapeRegex(value.name);
+
+    // Only search by validated name
     const instructors = await Instructor.find({
       name: {
-        $regex: escapeRegex(value.name),
+        $regex: safeName,
         $options: 'i'
       }
     })
@@ -114,8 +121,7 @@ export async function searchInstructors(req, res, next) {
       .sort({ name: 1 })
       .lean();
 
-    // Step 3: Return only public data
-    res.json({
+    return res.status(200).json({
       count: instructors.length,
       instructors
     });
